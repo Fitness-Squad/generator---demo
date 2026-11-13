@@ -56,7 +56,7 @@ function bounds(p){let d=new Date(),b=Date.now();d.setHours(0,0,0,0);if(p==="wee
 function chartData(p,g){let now=new Date(),data=[];if(p==="day"){let start=new Date();start.setHours(0,0,0,0);for(let i=0;i<=now.getHours();i++){let a=start.getTime()+i*3600000;data.push([String(i),pct(a,Math.min(a+3600000,Date.now()),g)])}}else if(p==="week"||p==="month"){let n=p==="week"?7:30;for(let i=n-1;i>=0;i--){let d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-i);let a=d.getTime();data.push([d.getDate()+"/"+(d.getMonth()+1),pct(a,Math.min(a+86400000,Date.now()),g)])}}else{for(let i=11;i>=0;i--){let d=new Date(now.getFullYear(),now.getMonth()-i,1),a=d.getTime(),b=Math.min(Date.now(),new Date(d.getFullYear(),d.getMonth()+1,1).getTime());data.push([(d.getMonth()+1)+"/"+String(d.getFullYear()).slice(-2),pct(a,b,g)])}}return data}
 
 function btn(label,action,cls=""){
-return `<button class="${cls}" onclick="${action}">${label}</button>`
+return `<button class="${cls}" onclick="${esc(action)}">${label}</button>`
 }
 function home(){
 show(`<div class="card">
@@ -166,15 +166,15 @@ show(`<div class="card">
 <textarea id="description" rows="4" placeholder="תאר בקצרה את התקלה (נתוני דמה בלבד)"></textarea>
 <label>השפעה על כשירות</label><select id="impact"><option value="yes">🔴 תקלה משביתה — לא כשיר</option><option value="no">🟢 תקלה לא משביתה</option></select><p class="small">תקלה משביתה מעדכנת את הכשירות אוטומטית עד סגירתה. אין להזין מידע אמיתי.</p>
 ${btn("שלח קריאת תקלה","createTicket()","green")}
-${btn("חזרה","finish(result)","gray")}
+${btn("חזרה","home()","gray")}
 </div>`)
 }
-function newTicket(status,description){
+function newTicket(status,description,impactsReadiness=false){
 let t={
-id:"DEMO-"+Date.now().toString().slice(-7),
+id:"DEMO-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,6),
 generator,status,description,result,
 history:[...history],
-date:new Date().toLocaleString("he-IL"),createdAt:Date.now(),closedAt:["סגורה","נסגרה עצמאית"].includes(status)?Date.now():null,impactsReadiness:arguments[2]||false
+date:new Date().toLocaleString("he-IL"),createdAt:Date.now(),closedAt:["סגורה","נסגרה עצמאית"].includes(status)?Date.now():null,impactsReadiness
 };
 tickets.unshift(t);save();return t
 }
