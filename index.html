@@ -31,7 +31,7 @@ input,textarea{width:100%;padding:14px;border:1px solid #ccd5df;border-radius:12
 <body>
 <header>
 <h1>⚡ מרכז ניהול גנרטורים</h1>
-<p>אבחון תקלות • ניהול קריאות • מעקב</p>
+<p>אבחון תקלות • כשירות • אחזקה חודשית</p>
 </header>
 <main id="app"></main>
 <script>
@@ -39,6 +39,21 @@ const $=document.getElementById("app");
 const KEY="generator_demo_v8";
 const GENERATORS=["GEN-DEMO-001","GEN-DEMO-002","GEN-DEMO-003","GEN-DEMO-004","GEN-DEMO-005"];
 let period="day",filterGen="all";
+const MKEY="generator_demo_maintenance_v9";
+let maintenance={};try{maintenance=JSON.parse(localStorage.getItem(MKEY))||{}}catch(e){}
+function saveMaintenance(){localStorage.setItem(MKEY,JSON.stringify(maintenance))}
+function monthKey(d=new Date()){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
+function previousMonth(d=new Date()){return monthKey(new Date(d.getFullYear(),d.getMonth()-1,1))}
+function maintRecords(g){return maintenance[g]||[]}
+function currentMaint(g){return maintRecords(g).some(x=>x.month===monthKey())}
+function dueMaintenance(){return GENERATORS.filter(g=>!currentMaint(g))}
+function recurring(g){let since=Date.now()-90*86400000;return tickets.filter(t=>t.generator===g&&t.createdAt>=since).length}
+function health(g){let n=recurring(g),[a,b]=bounds("month");return Math.max(0,Math.round(pct(a,b,g)-Math.min(35,n*5)-(currentMaint(g)?0:10)))}
+function maintenanceHome(){let due=dueMaintenance();show(`<div class="card"><h2>🛠️ שגרת אחזקה חודשית</h2><p class="note">כל גנרטור נדרש לטיפול אחת לחודש. רשימת הבדיקות היא דוגמה בלבד ואינה הוראת טיפול. יש לפעול לפי הוראות יצרן וגורם מוסמך.</p><div class="badge">חודש: ${monthKey()} | בוצעו: ${GENERATORS.length-due.length}/${GENERATORS.length} | ממתינים: ${due.length}</div>${GENERATORS.map(g=>`<div class="badge"><strong>${g}</strong><br>${currentMaint(g)?"✅ הטיפול החודשי תועד":"🟠 ממתין לטיפול חודשי"}<br>ציון בריאות משוער: ${health(g)}/100<br>קריאות ב־90 יום: ${recurring(g)}${btn("כרטיס גנרטור / טיפול",`generatorCard('${g}')`,"gray")}</div>`).join("")}${btn("🏠 חזרה","home()","gray")}</div>`)}
+function generatorCard(g){generator=g;let records=maintRecords(g),related=tickets.filter(t=>t.generator===g),last=records.at(-1);show(`<div class="card"><h2>⚙️ ${g}</h2><div class="grid"><div class="metric">כשירות<strong>${ready(g)?"🟢":"🔴"}</strong></div><div class="metric">בריאות משוערת<strong>${health(g)}/100</strong></div></div><p>תקלות ב־90 יום: ${recurring(g)} ${recurring(g)>=3?"⚠️ תקלות חוזרות":""}</p><p>טיפול חודשי: ${currentMaint(g)?"בוצע":"ממתין לביצוע"}</p><p>טיפול אחרון: ${last?new Date(last.at).toLocaleDateString("he-IL"):"אין תיעוד"}</p><h3>היסטוריית טיפולים</h3>${records.length?records.slice().reverse().map(x=>`<div class="badge">${esc(x.month)} — ${new Date(x.at).toLocaleString("he-IL")}<br>מבצע: ${esc(x.by)}<br>הערות: ${esc(x.notes||"ללא")}</div>`).join(""):"<p>אין עדיין טיפולים מתועדים.</p>"}${btn("🛠️ תיעוד טיפול חודשי","maintenanceForm()","green")}${btn("🚨 פתיחת תקלה","directReport()","red")}${btn("חזרה לשגרות","maintenanceHome()","gray")}</div>`)}
+function maintenanceForm(){show(`<div class="card"><h2>🛠️ תיעוד טיפול חודשי</h2><p>גנרטור: ${generator} | חודש: ${monthKey()}</p><p class="note">הטופס הוא תיעוד מנהלתי בלבד. אין לבצע טיפול על סמך רשימה זו. טיפול בפועל ייעשה לפי נוהל מאושר בידי איש מקצוע מוסמך.</p><label>שם מבצע (דמה בלבד)</label><input id="maintBy" maxlength="70" placeholder="טכנאי דמה"><label>תוצאת טיפול</label><select id="maintResult"><option value="done">בוצע והושלם</option><option value="issue">נמצאה תקלה — נדרשת קריאה</option></select><label>הערות (דמה בלבד)</label><textarea id="maintNotes" maxlength="300" placeholder="הערות לדוגמה"></textarea>${btn("שמור תיעוד טיפול","completeMaintenance()","green")}${btn("חזרה","generatorCard(generator)","gray")}</div>`)}
+function completeMaintenance(){let by=document.getElementById("maintBy").value.trim()||"טכנאי דמה",notes=document.getElementById("maintNotes").value.trim(),issue=document.getElementById("maintResult").value==="issue";if(!maintenance[generator])maintenance[generator]=[];if(maintenance[generator].some(x=>x.month===monthKey())){alert("טיפול לחודש זה כבר תועד");return}maintenance[generator].push({month:monthKey(),at:Date.now(),by,notes,issue});saveMaintenance();if(issue){alert("התיעוד נשמר. כעת יש לפתוח קריאת תקלה.");directReport()}else generatorCard(generator)}
+
 let tickets=[];
 try{tickets=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){}
 let step="",history=[],generator="GEN-DEMO-001",result="";
@@ -60,12 +75,13 @@ return `<button class="${cls}" onclick="${esc(action)}">${label}</button>`
 }
 function home(){
 show(`<div class="card">
-<h2>שלום וברוכים הבאים 👋</h2>
+<h2>שלום וברוכים הבאים 👋</h2><p class="note">🛠️ טיפולים חודשיים ממתינים: ${dueMaintenance().length} מתוך ${GENERATORS.length}</p>
 <p>מה תרצה לעשות?</p>
 ${btn("🔍 התחלת אבחון תקלה","identify()","green")}
 ${btn("🚨 פתיחת תקלה ישירה","directReport()","red")}
 ${btn("📋 התקלות שלי","myTickets()")}
 ${btn("📊 תמונת מצב","dashboard()")}
+${btn("🛠️ שגרת אחזקה חודשית","maintenanceHome()","gold")}
 ${btn("👥 ניהול משתמשים","users()","gray")}
 </div>
 <div class="card">
@@ -240,7 +256,7 @@ tickets[i].status=s;if(s==="סגורה")tickets[i].closedAt=Date.now();save();ti
 }
 function dashboard(){
 let [a,b]=bounds(period),gs=filterGen==="all"?GENERATORS:[filterGen],open=tickets.filter(t=>!closed(t)&&gs.includes(t.generator)),finished=tickets.filter(t=>closed(t)&&t.createdAt&&t.closedAt&&t.closedAt>=a&&t.closedAt<=b&&gs.includes(t.generator)),average=finished.length?finished.reduce((sum,t)=>sum+t.closedAt-t.createdAt,0)/finished.length:null,points=chartData(period,filterGen),downtime=gs.reduce((sum,g)=>sum+outage(g,a,b),0);
-show(`<div class="card"><h2>📊 כשירות וביצועים</h2><label>בחירת גנרטור</label><select id="filterGen"><option value="all">כלל הגנרטורים</option>${GENERATORS.map(g=>`<option value="${g}">${g}</option>`).join("")}</select><div class="tabs">${[["day","יום"],["week","שבוע"],["month","חודש"],["year","שנה"]].map(([k,label])=>btn(label,`setPeriod('${k}')`,period===k?"green":"gray")).join("")}</div><div class="grid"><div class="metric">כשירות נוכחית<strong>${(100*gs.filter(ready).length/gs.length).toFixed(0)}%</strong></div><div class="metric">כשירות בתקופה<strong>${pct(a,b,filterGen).toFixed(1)}%</strong></div><div class="metric">קריאות פתוחות<strong>${open.length}</strong></div><div class="metric">זמן טיפול ממוצע<strong style="font-size:17px">${average===null?"אין נתונים":dur(average)}</strong></div></div><h3>📈 גרף כשירות לפי ${({day:"שעות",week:"ימים",month:"ימים",year:"חודשים"})[period]}</h3><div class="chart">${points.map(([label,value])=>`<div class="bar" title="${label}: ${value.toFixed(1)}%" style="height:${Math.max(2,value)}%;background:${value<90?"#bb4050":value<99?"#d89c25":"#16865e"}"></div>`).join("")}</div><p class="small">מימין: ${points[0]?.[0]||""} | משמאל: ${points[points.length-1]?.[0]||""}. כל עמודה מייצגת אחוז כשירות בפרק הזמן שלה.</p><div class="badge">⏱️ השבתה מצטברת: ${dur(downtime)}</div><div class="badge">✅ קריאות שנסגרו בתקופה: ${finished.length}</div><p class="small">כשירות מחושבת לפי זמן השבתה בפועל מתוך הזמן הנמדד, ללא ספירה כפולה של תקלות חופפות. נתוני עבר מגרסה 7 אינם כוללים חותמות זמן מדויקות.</p>${btn("🚨 פתיחת תקלה","directReport()","red")}${btn("📋 קריאות","myTickets()")}${btn("🏠 בית","home()","gray")}</div>`);
+show(`<div class="card"><h2>📊 כשירות וביצועים</h2><label>בחירת גנרטור</label><select id="filterGen"><option value="all">כלל הגנרטורים</option>${GENERATORS.map(g=>`<option value="${g}">${g}</option>`).join("")}</select><div class="tabs">${[["day","יום"],["week","שבוע"],["month","חודש"],["year","שנה"]].map(([k,label])=>btn(label,`setPeriod('${k}')`,period===k?"green":"gray")).join("")}</div><div class="grid"><div class="metric">כשירות נוכחית<strong>${(100*gs.filter(ready).length/gs.length).toFixed(0)}%</strong></div><div class="metric">כשירות בתקופה<strong>${pct(a,b,filterGen).toFixed(1)}%</strong></div><div class="metric">קריאות פתוחות<strong>${open.length}</strong></div><div class="metric">זמן טיפול ממוצע<strong style="font-size:17px">${average===null?"אין נתונים":dur(average)}</strong></div></div><h3>📈 גרף כשירות לפי ${({day:"שעות",week:"ימים",month:"ימים",year:"חודשים"})[period]}</h3><div class="chart">${points.map(([label,value])=>`<div class="bar" title="${label}: ${value.toFixed(1)}%" style="height:${Math.max(2,value)}%;background:${value<90?"#bb4050":value<99?"#d89c25":"#16865e"}"></div>`).join("")}</div><p class="small">מימין: ${points[0]?.[0]||""} | משמאל: ${points[points.length-1]?.[0]||""}. כל עמודה מייצגת אחוז כשירות בפרק הזמן שלה.</p><div class="badge">🛠️ טיפולים חודשיים ממתינים: ${dueMaintenance().filter(g=>gs.includes(g)).length}</div><div class="badge">⏱️ השבתה מצטברת: ${dur(downtime)}</div><div class="badge">✅ קריאות שנסגרו בתקופה: ${finished.length}</div><p class="small">כשירות מחושבת לפי זמן השבתה בפועל מתוך הזמן הנמדד, ללא ספירה כפולה של תקלות חופפות. נתוני עבר מגרסה 7 אינם כוללים חותמות זמן מדויקות.</p>${btn("🚨 פתיחת תקלה","directReport()","red")}${btn("🛠️ שגרת אחזקה","maintenanceHome()","gold")}${btn("📋 קריאות","myTickets()")}${btn("🏠 בית","home()","gray")}</div>`);
 document.getElementById("filterGen").value=filterGen;document.getElementById("filterGen").onchange=e=>{filterGen=e.target.value;dashboard()}
 }
 function setPeriod(p){period=p;dashboard()}
