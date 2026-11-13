@@ -48,6 +48,24 @@ option{background:#102037;color:white}
 .bar{flex:1;min-width:2px;background:var(--green);border-radius:5px 5px 0 0;box-shadow:0 0 7px #24c99722}
 @media(min-width:650px){header{padding-right:max(28px,calc((100vw - 700px)/2))}main{padding-top:22px}.card{padding:28px}}
 @media(max-width:370px){.card{padding:16px}.tabs button{font-size:12px}.metric{padding:12px 5px}}
+
+.home-hero{background:linear-gradient(145deg,#19354b,#102137);border:1px solid #34627a;border-radius:24px;padding:23px;margin:14px 0;box-shadow:0 12px 40px #0005}
+.home-hero h2{font-size:23px;margin-bottom:4px}.home-hero .small{margin-bottom:16px}
+.gauge-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.gauge-tile{background:#102337;border:1px solid #2d5066;border-radius:18px;padding:13px 6px;text-align:center;min-width:0}
+.gauge{--v:100;--ring:#24c997;width:min(100%,120px);aspect-ratio:1;margin:0 auto 10px;border-radius:50%;background:conic-gradient(var(--ring) calc(var(--v)*1%),#2d4053 0);display:grid;place-items:center;position:relative}
+.gauge:before{content:"";position:absolute;inset:10%;border-radius:50%;background:#102337}
+.gauge strong{position:relative;font-size:clamp(18px,4vw,28px);color:#e8f9ff;z-index:1;letter-spacing:-1px}
+.gauge-tile span{font-size:12px;color:#c3d7e6;display:block;line-height:1.35}
+.home-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
+.home-strip div{background:#1c3448;border-radius:13px;padding:11px 5px;text-align:center;font-size:11px;color:#c5d8e8}
+.home-strip strong{display:block;font-size:23px;color:#f1fbff}
+.fleet-map{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:9px}
+.fleet-node{background:#162c40;border:1px solid #3b586d;border-radius:15px;padding:13px 9px;text-align:right;color:#e9f5ff;font-size:13px}
+.fleet-node:before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:#24c997;margin-left:7px;box-shadow:0 0 8px #24c99788}
+.fleet-node.off:before{background:#ff657e;box-shadow:0 0 8px #ff657e88}
+.fleet-node small{display:block;color:#9fb7c9;margin-top:5px}
+@media(max-width:370px){.gauge-grid{gap:5px}.gauge-tile{padding:10px 3px}.gauge:before{inset:11%}.gauge strong{font-size:17px}}
 </style>
 </head>
 <body>
@@ -143,24 +161,30 @@ for(const g of Object.keys(maintenance))maintenance[g]=maintenance[g].filter(x=>
 save();saveMaintenance();home()
 }
 
+function gaugeTile(label,value){
+let v=Math.max(0,Math.min(100,value)),color=v>=95?"#24c997":v>=80?"#ffc36d":"#ff657e";
+return `<div class="gauge-tile"><div class="gauge" style="--v:${v.toFixed(2)};--ring:${color}"><strong>${v.toFixed(0)}%</strong></div><span>${label}</span></div>`
+}
 function home(){
-show(`<div class="card">
-<h2>שלום וברוכים הבאים 👋</h2><p class="note">🛠️ טיפולים חודשיים ממתינים: ${dueMaintenance().length} מתוך ${GENERATORS.length}</p>
-<p>מה תרצה לעשות?</p>
+let now=Date.now(),weekStart=now-7*86400000,monthStart=now-30*86400000;
+let readyCount=GENERATORS.filter(ready).length,off=GENERATORS.length-readyCount,open=tickets.filter(t=>!closed(t)).length;
+show(`<section class="home-hero"><h2>⚡ תמונת מצב בזמן אמת</h2><p class="small">מערך גנרטורים לדוגמה · הנתונים מעודכנים לפי הקריאות בדפדפן זה</p><div class="gauge-grid">
+${gaugeTile("כשירות נוכחית",100*readyCount/GENERATORS.length)}
+${gaugeTile("ממוצע 7 ימים",pct(weekStart,now,"all"))}
+${gaugeTile("ממוצע 30 ימים",pct(monthStart,now,"all"))}
+</div><div class="home-strip"><div><strong>${readyCount}/${GENERATORS.length}</strong>כשירים</div><div><strong style="color:${off?"#ff8298":"#5be1bd"}">${off}</strong>מושבתים</div><div><strong>${open}</strong>קריאות פתוחות</div></div>
+${btn("📈 מעבר לגרפים מפורטים","dashboard()","green")}</section>
+<div class="card"><h2>🗺️ מפת כשירות סכמטית</h2><p class="small">תרשים ציוד להמחשה בלבד — אינו מציג מיקומים גאוגרפיים.</p><div class="fleet-map">${GENERATORS.map(g=>`<button class="fleet-node ${ready(g)?"":"off"}" onclick="generatorCard('${g}')">${g}<small>${ready(g)?"🟢 כשיר":"🔴 לא כשיר"} · בריאות ${health(g)}/100</small></button>`).join("")}</div></div>
+<div class="card"><h2>ניהול מהיר</h2><div class="badge">🛠️ טיפולים חודשיים ממתינים: <strong>${dueMaintenance().length} מתוך ${GENERATORS.length}</strong></div>
+${btn("🛠️ שגרת אחזקה חודשית","maintenanceHome()","gold")}
 ${btn("🔍 התחלת אבחון תקלה","identify()","green")}
 ${btn("🚨 פתיחת תקלה ישירה","directReport()","red")}
 ${btn("📋 התקלות שלי","myTickets()")}
-${btn("📊 תמונת מצב","dashboard()")}
-${btn("🛠️ שגרת אחזקה חודשית","maintenanceHome()","gold")}
-${btn("👥 ניהול משתמשים","users()","gray")}
-</div>
-<div class="card">
-<h3>🧪 סביבת נתוני דמה</h3>
-<p>אפשר לטעון היסטוריה לדוגמה: תקלות פתוחות וסגורות, השבתות וטיפולים חודשיים, כדי לראות גרפים עם נתונים.</p>
+${btn("👥 ניהול משתמשים","users()","gray")}</div>
+<div class="card"><h3>🧪 סביבת נתוני דמה</h3><p>אפשר לטעון היסטוריה לדוגמה: תקלות פתוחות וסגורות, השבתות וטיפולים חודשיים.</p>
 ${btn("📥 טען היסטוריית דמה","seedDemo()","green")}
 ${btn("🧹 הסר רק נתוני דמה שנטענו","clearSeedDemo()","gray")}
-<p class="small">המערכת פועלת עם נתוני דמה בלבד ובדפדפן הנוכחי. אין להזין מידע אמיתי או רגיש.</p>
-</div>`)
+<p class="small">נתוני ההדגמה נשמרים בדפדפן הנוכחי בלבד. אין להזין מידע אמיתי או רגיש.</p></div>`)
 }
 function identify(){
 show(`<div class="card">
