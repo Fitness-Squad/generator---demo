@@ -5,28 +5,50 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ניהול תקלות גנרטורים</title>
 <style>
+:root{color-scheme:dark;--bg:#07111f;--surface:#111e30;--surface2:#18283d;--line:#2a3b52;--text:#f0f6ff;--muted:#9db0c7;--accent:#53d9e7;--green:#24c997;--red:#ff657e;--amber:#ffc36d}
 *{box-sizing:border-box}
-body{margin:0;background:#edf2f7;font-family:Arial,sans-serif;color:#172b45}
-header{background:#142b47;color:white;padding:24px;text-align:center}
-header h1{margin:0;font-size:23px}
-header p{color:#b9cce0}
-main{max-width:520px;margin:auto;padding:18px}
-.card{background:white;border-radius:20px;padding:22px;margin:14px 0;box-shadow:0 4px 18px #152c4512}
-h2{margin-top:0}
-button{width:100%;border:0;border-radius:14px;padding:17px;margin:7px 0;font-size:17px;font-weight:bold;background:#195caa;color:white;cursor:pointer}
-button:active{opacity:.7}
-.green{background:#16865e}
-.red{background:#bb4050}
-.gray{background:#e8eef5;color:#20334c}
-.gold{background:#d89c25;color:#172b45}
-input,textarea{width:100%;padding:14px;border:1px solid #ccd5df;border-radius:12px;font-size:16px;margin:8px 0}
-.small{color:#64748b;font-size:14px}
-.badge{background:#e7f2ff;border-radius:12px;padding:12px;margin:10px 0}
-.progress{height:7px;background:#dce5ef;border-radius:9px;margin:18px 0}
-.progress div{height:100%;background:#16865e;border-radius:9px}
-.row{display:flex;gap:10px}
-.row button{flex:1}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric{background:#edf5fc;border-radius:12px;padding:14px;text-align:center}.metric strong{display:block;font-size:25px}.tabs{display:flex;gap:5px}.tabs button{padding:10px;font-size:14px}.chart{height:175px;display:flex;align-items:end;gap:3px;border-bottom:1px solid #bbb}.bar{flex:1;min-width:2px;background:#16865e;border-radius:4px 4px 0 0}select{width:100%;padding:14px;font-size:16px;border-radius:12px;border:1px solid #ccd5df;background:white;margin:8px 0}.note{background:#fff3d6;padding:12px;border-radius:12px}</style>
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 90% 0%,#163c50 0%,transparent 38%),linear-gradient(180deg,#091727,#07111f 45%,#0b1524);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--text);line-height:1.55}
+header{position:relative;overflow:hidden;background:linear-gradient(125deg,#102c41 0%,#11263a 55%,#102034 100%);color:var(--text);padding:35px 22px 30px;text-align:right;border-bottom:1px solid #29455c}
+header:before{content:"";position:absolute;width:210px;height:210px;left:-75px;top:-110px;background:radial-gradient(circle,#37b9cc55,transparent 70%);pointer-events:none}
+header:after{content:"●  DEMO  •  V9";display:inline-block;margin-top:16px;padding:5px 12px;border:1px solid #477389;background:#15394a;border-radius:100px;color:#a9e8ef;font-size:11px;font-weight:800;letter-spacing:1.4px}
+header h1{margin:0;font-size:clamp(25px,6vw,34px);font-weight:850;letter-spacing:-.8px}
+header h1:first-letter{color:var(--accent)}
+header p{color:#b6cadb;margin:8px 0 0;font-size:14px}
+main{max-width:740px;margin:auto;padding:16px 16px 70px}
+.card{background:linear-gradient(160deg,#15243a 0%,#101c2d 100%);border:1px solid #2b3e56;border-radius:23px;padding:23px;margin:14px 0;box-shadow:0 12px 38px #02091455}
+.card:first-child{border-top:2px solid #45cbd5}
+h2{margin:0 0 17px;font-size:22px;font-weight:800;letter-spacing:-.3px}
+h3{margin:20px 0 12px;font-size:17px;color:#dcebf8}
+p{margin:11px 0}
+label{display:block;margin-top:13px;color:#d3e3f0;font-size:14px;font-weight:700}
+button{display:block;width:100%;border:1px solid #3c6c87;border-radius:14px;padding:15px 17px;margin:10px 0;font-size:15px;font-weight:750;background:linear-gradient(135deg,#176b8c,#165577);color:#f6fbff;cursor:pointer;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease;box-shadow:0 3px 12px #00000022;text-align:center;min-height:49px}
+button:active{transform:scale(.98);filter:brightness(1.15)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.green{background:linear-gradient(135deg,#0d967b,#127d71);border-color:#22a98b}
+button.red{background:linear-gradient(135deg,#b74765,#943e5d);border-color:#db7289}
+button.gray{background:#1d3047;border-color:#344b64;color:#dbe8f6;box-shadow:none}
+button.gold{background:linear-gradient(135deg,#c58d39,#a8762b);border-color:#e1ae61;color:#111d2b}
+input,textarea,select{width:100%;padding:13px 14px;border:1px solid #3a526c;border-radius:13px;font-size:16px;margin:7px 0 10px;background:#0b192a;color:var(--text);font-family:inherit}
+input::placeholder,textarea::placeholder{color:#8297ad}
+option{background:#102037;color:white}
+.small{color:var(--muted);font-size:13px;line-height:1.6}
+.badge{background:#1a2d42;border:1px solid #30485f;border-radius:15px;padding:15px;margin:12px 0;color:#e2edf8;overflow-wrap:anywhere}
+.badge strong{color:#77e1ea}
+.note{background:#312a20;border:1px solid #695439;border-right:4px solid var(--amber);padding:14px;border-radius:12px;color:#ffe5b7}
+.progress{height:8px;background:#2a3b50;border-radius:9px;margin:18px 0;overflow:hidden}
+.progress div{height:100%;background:var(--green);border-radius:9px}
+.row{display:flex;gap:10px}.row button{flex:1}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0}
+.metric{background:linear-gradient(145deg,#20374d,#192a40);border:1px solid #38536c;border-radius:17px;padding:17px 9px;text-align:center;color:#c7d7e7;font-size:12px}
+.metric strong{display:block;font-size:clamp(20px,5vw,29px);color:#74e4df;margin-top:7px;line-height:1.35;overflow-wrap:anywhere}
+.tabs{display:flex;gap:6px;margin:12px 0}
+.tabs button{flex:1;min-width:0;padding:10px 4px;font-size:13px;margin:0;border-radius:11px}
+.chart{height:195px;display:flex;align-items:end;gap:3px;border-bottom:1px solid #527089;background:repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),#263d52 calc(25% - 1px),#263d52 25%);border-radius:10px 10px 0 0;padding:8px 4px 0;overflow:hidden}
+.bar{flex:1;min-width:2px;background:var(--green);border-radius:5px 5px 0 0;box-shadow:0 0 7px #24c99722}
+@media(min-width:650px){header{padding-right:max(28px,calc((100vw - 700px)/2))}main{padding-top:22px}.card{padding:28px}}
+@media(max-width:370px){.card{padding:16px}.tabs button{font-size:12px}.metric{padding:12px 5px}}
+</style>
 </head>
 <body>
 <header>
