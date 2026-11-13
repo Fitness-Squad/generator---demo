@@ -73,6 +73,54 @@ function chartData(p,g){let now=new Date(),data=[];if(p==="day"){let start=new D
 function btn(label,action,cls=""){
 return `<button class="${cls}" onclick="${esc(action)}">${label}</button>`
 }
+
+function seedDemo(){
+if(tickets.some(t=>t.demoSeed)){alert("נתוני ההדגמה כבר נטענו. אפשר להסיר אותם ואז לטעון מחדש.");return}
+let now=Date.now(),hour=3600000,day=24*hour;
+let specs=[
+[0,1,2,3,"תקלה במערכת התנעה (דמה)",true],
+[1,2,5,7,"תקלה במערכת אספקת חשמל (דמה)",true],
+[2,3,9,4,"בדיקת התראה בלוח פיקוד (דמה)",false],
+[0,4,14,8,"כשל התנעה חוזר (דמה)",true],
+[3,5,20,14,"תקלה בחיווי חיישן (דמה)",false],
+[1,6,25,10,"הפסקת פעולה לא צפויה (דמה)",true],
+[0,7,35,5,"כשל התנעה חוזר (דמה)",true],
+[4,8,45,18,"השבתה לבדיקת מערכת (דמה)",true],
+[2,9,55,3,"תקלה לא משביתה (דמה)",false],
+[0,10,65,9,"כשל התנעה חוזר (דמה)",true],
+[3,11,75,11,"השבתה זמנית (דמה)",true],
+[1,12,85,6,"תקלה במערכת התנעה (דמה)",true]
+];
+specs.forEach(([gi,ix,days,hours,description,impactsReadiness])=>{
+let createdAt=now-days*day-(ix%4)*hour,closedAt=createdAt+hours*hour;
+tickets.push({id:"DEMO-HIST-"+String(ix).padStart(3,"0"),generator:GENERATORS[gi],status:"סגורה",description,result:"resolved",history:[],date:new Date(createdAt).toLocaleString("he-IL"),createdAt,closedAt,impactsReadiness,demoSeed:true})
+});
+let openStart=now-7*hour;
+tickets.unshift({id:"DEMO-OPEN-001",generator:GENERATORS[2],status:"בטיפול",description:"תקלה משביתה פעילה להמחשה",result:"unresolved",history:[],date:new Date(openStart).toLocaleString("he-IL"),createdAt:openStart,closedAt:null,impactsReadiness:true,demoSeed:true});
+tickets.unshift({id:"DEMO-OPEN-002",generator:GENERATORS[0],status:"חדשה",description:"התראה לא משביתה להמחשה",result:"unresolved",history:[],date:new Date(now-2*hour).toLocaleString("he-IL"),createdAt:now-2*hour,closedAt:null,impactsReadiness:false,demoSeed:true});
+let d=new Date();
+for(let monthsAgo=0;monthsAgo<4;monthsAgo++){
+let target=new Date(d.getFullYear(),d.getMonth()-monthsAgo,1);
+let key=monthKey(target),limit=monthsAgo===0?3:5;
+for(let i=0;i<limit;i++){
+let g=GENERATORS[i];if(!maintenance[g])maintenance[g]=[];
+if(maintenance[g].some(x=>x.month===key))continue;
+let at=new Date(target.getFullYear(),target.getMonth(),Math.min(4+i*2,new Date().getDate()),10+i,0).getTime();
+if(at>now)at=now-60000;
+maintenance[g].push({month:key,at,by:"טכנאי דמה "+(i+1),notes:"טיפול תקופתי לדוגמה",issue:false,demoSeed:true})
+}
+}
+save();saveMaintenance();home();alert("נטענו 14 קריאות דמה והיסטוריית טיפולים לדוגמה. אפשר לצפות בגרפים ובשגרות.")
+}
+function clearSeedDemo(){
+let count=tickets.filter(t=>t.demoSeed).length;
+if(!count&&!Object.values(maintenance).some(a=>a.some(x=>x.demoSeed))){alert("אין נתוני דמה טעונים להסרה");return}
+if(!confirm("להסיר רק את נתוני הדמה שנטענו? קריאות אחרות יישמרו."))return;
+tickets=tickets.filter(t=>!t.demoSeed);
+for(const g of Object.keys(maintenance))maintenance[g]=maintenance[g].filter(x=>!x.demoSeed);
+save();saveMaintenance();home()
+}
+
 function home(){
 show(`<div class="card">
 <h2>שלום וברוכים הבאים 👋</h2><p class="note">🛠️ טיפולים חודשיים ממתינים: ${dueMaintenance().length} מתוך ${GENERATORS.length}</p>
@@ -85,7 +133,10 @@ ${btn("🛠️ שגרת אחזקה חודשית","maintenanceHome()","gold")}
 ${btn("👥 ניהול משתמשים","users()","gray")}
 </div>
 <div class="card">
-<h3>מערכת הדגמה</h3>
+<h3>🧪 סביבת נתוני דמה</h3>
+<p>אפשר לטעון היסטוריה לדוגמה: תקלות פתוחות וסגורות, השבתות וטיפולים חודשיים, כדי לראות גרפים עם נתונים.</p>
+${btn("📥 טען היסטוריית דמה","seedDemo()","green")}
+${btn("🧹 הסר רק נתוני דמה שנטענו","clearSeedDemo()","gray")}
 <p class="small">המערכת פועלת עם נתוני דמה בלבד ובדפדפן הנוכחי. אין להזין מידע אמיתי או רגיש.</p>
 </div>`)
 }
