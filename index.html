@@ -66,6 +66,19 @@ option{background:#102037;color:white}
 .fleet-node.off:before{background:#ff657e;box-shadow:0 0 8px #ff657e88}
 .fleet-node small{display:block;color:#9fb7c9;margin-top:5px}
 @media(max-width:370px){.gauge-grid{gap:5px}.gauge-tile{padding:10px 3px}.gauge:before{inset:11%}.gauge strong{font-size:17px}}
+
+.ticket-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:15px 0}
+.ticket-section{background:#1d3047;border:1px solid #3a536b;border-radius:14px;padding:13px;text-align:center;font-size:13px}
+.ticket-section strong{display:block;font-size:26px;color:#eaf8ff}
+.ticket-section.open{border-color:#d8a356}.ticket-section.done{border-color:#28ae8b}
+.ticket-card{border-right:4px solid #dca85b}
+.ticket-card.done{border-right-color:#2ec89d;opacity:.9}
+.trade-tag{display:inline-block;padding:6px 10px;border-radius:9px;font-size:12px;font-weight:800;margin:6px 0}
+.trade-electric{background:#42351e;color:#ffe092;border:1px solid #98753a}
+.trade-water{background:#163b54;color:#8edcff;border:1px solid #387ca2}
+.trade-mechanic{background:#432b40;color:#ffc0ed;border:1px solid #895478}
+.trade-general{background:#2a3b46;color:#d5e4f0;border:1px solid #506679}
+.ticket-state{display:inline-block;border-radius:8px;padding:4px 9px;font-size:12px;background:#2a4055;color:#d9edfa;margin:4px}
 </style>
 </head>
 <body>
@@ -133,11 +146,12 @@ let specs=[
 ];
 specs.forEach(([gi,ix,days,hours,description,impactsReadiness])=>{
 let createdAt=now-days*day-(ix%4)*hour,closedAt=createdAt+hours*hour;
-tickets.push({id:"DEMO-HIST-"+String(ix).padStart(3,"0"),generator:GENERATORS[gi],status:"סגורה",description,result:"resolved",history:[],date:new Date(createdAt).toLocaleString("he-IL"),createdAt,closedAt,impactsReadiness,demoSeed:true})
+tickets.push({trade:["electric","water","mechanic","general"][ix%4],id:"DEMO-HIST-"+String(ix).padStart(3,"0"),generator:GENERATORS[gi],status:"סגורה",description,result:"resolved",history:[],date:new Date(createdAt).toLocaleString("he-IL"),createdAt,closedAt,impactsReadiness,demoSeed:true})
 });
+tickets.filter(t=>t.demoSeed).forEach((t,i)=>{t.trade=["electric","water","mechanic","electric","general"][i%5]});
 let openStart=now-7*hour;
-tickets.unshift({id:"DEMO-OPEN-001",generator:GENERATORS[2],status:"בטיפול",description:"תקלה משביתה פעילה להמחשה",result:"unresolved",history:[],date:new Date(openStart).toLocaleString("he-IL"),createdAt:openStart,closedAt:null,impactsReadiness:true,demoSeed:true});
-tickets.unshift({id:"DEMO-OPEN-002",generator:GENERATORS[0],status:"חדשה",description:"התראה לא משביתה להמחשה",result:"unresolved",history:[],date:new Date(now-2*hour).toLocaleString("he-IL"),createdAt:now-2*hour,closedAt:null,impactsReadiness:false,demoSeed:true});
+tickets.unshift({id:"DEMO-OPEN-001",generator:GENERATORS[2],status:"בטיפול",description:"תקלה משביתה פעילה להמחשה",result:"unresolved",history:[],date:new Date(openStart).toLocaleString("he-IL"),createdAt:openStart,closedAt:null,impactsReadiness:true,trade:"electric",demoSeed:true});
+tickets.unshift({id:"DEMO-OPEN-002",generator:GENERATORS[0],status:"חדשה",description:"התראה לא משביתה להמחשה",result:"unresolved",history:[],date:new Date(now-2*hour).toLocaleString("he-IL"),createdAt:now-2*hour,closedAt:null,impactsReadiness:false,trade:"water",demoSeed:true});
 let d=new Date();
 for(let monthsAgo=0;monthsAgo<4;monthsAgo++){
 let target=new Date(d.getFullYear(),d.getMonth()-monthsAgo,1);
@@ -271,13 +285,19 @@ ${btn("חזרה לאבחון","back()","gray")}
 </div>`)
 }
 function directReport(){history=[];result="unresolved";report()}
+const TRADES={electric:["⚡ נדרש טיפול חשמלאי","trade-electric"],water:["💧 נדרש טיפול מים","trade-water"],mechanic:["🔧 נדרש טיפול מכונאי","trade-mechanic"],general:["🧰 נדרש אבחון / שיבוץ","trade-general"]};
+function tradeTag(t){let x=TRADES[t.trade]||TRADES.general;return `<span class="trade-tag ${x[1]}">${x[0]}</span>`}
+function tradeSelect(value="general"){return `<select id="trade">${Object.entries(TRADES).map(([key,x])=>`<option value="${key}" ${value===key?"selected":""}>${x[0]}</option>`).join("")}</select>`}
+function changeTrade(i){let el=document.getElementById("trade");if(!el)return;tickets[i].trade=el.value;save();ticket(i)}
+function ticketGroup(t){return closed(t)?"done":"open"}
+function ticketCards(group){let entries=tickets.map((t,i)=>({t,i})).filter(x=>ticketGroup(x.t)===group);return entries.length?entries.map(({t,i})=>`<div class="badge ticket-card ${group==="done"?"done":""}"><strong>${esc(t.id)}</strong><br>${esc(t.generator)}<br>${tradeTag(t)}<br><span class="ticket-state">${esc(t.status)}</span><br><span class="safe-desc" data-i="${i}"></span><br><span class="small">${t.impactsReadiness?"🔴 משביתה":"🟢 לא משביתה"} · משך: ${span(t)}</span><br>${btn("פתיחת פרטי הקריאה",`ticket(${i})`,"gray")}</div>`).join(""):`<p class="small">אין קריאות בקטגוריה זו.</p>`}
 function report(){
 show(`<div class="card">
 <h2>🚨 פתיחת קריאת תקלה</h2>
 <label>בחר גנרטור</label><select id="reportGen">${GENERATORS.map(g=>`<option value="${g}">${g}</option>`).join("")}</select>
 <label>תיאור קצר של התקלה</label>
 <textarea id="description" rows="4" placeholder="תאר בקצרה את התקלה (נתוני דמה בלבד)"></textarea>
-<label>השפעה על כשירות</label><select id="impact"><option value="yes">🔴 תקלה משביתה — לא כשיר</option><option value="no">🟢 תקלה לא משביתה</option></select><p class="small">תקלה משביתה מעדכנת את הכשירות אוטומטית עד סגירתה. אין להזין מידע אמיתי.</p>
+<label>גורם מקצועי נדרש</label>${tradeSelect()}<label>השפעה על כשירות</label><select id="impact"><option value="yes">🔴 תקלה משביתה — לא כשיר</option><option value="no">🟢 תקלה לא משביתה</option></select><p class="small">תקלה משביתה מעדכנת את הכשירות אוטומטית עד סגירתה. אין להזין מידע אמיתי.</p>
 ${btn("שלח קריאת תקלה","createTicket()","green")}
 ${btn("חזרה","home()","gray")}
 </div>`)
@@ -287,7 +307,7 @@ let t={
 id:"DEMO-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,6),
 generator,status,description,result,
 history:[...history],
-date:new Date().toLocaleString("he-IL"),createdAt:Date.now(),closedAt:["סגורה","נסגרה עצמאית"].includes(status)?Date.now():null,impactsReadiness
+trade:"general",date:new Date().toLocaleString("he-IL"),createdAt:Date.now(),closedAt:["סגורה","נסגרה עצמאית"].includes(status)?Date.now():null,impactsReadiness
 };
 tickets.unshift(t);save();return t
 }
@@ -298,7 +318,7 @@ ticketDone(t)
 function createTicket(){
 let description=document.getElementById("description").value.trim();
 generator=document.getElementById("reportGen").value;
-let t=newTicket("חדשה",description||"ללא תיאור נוסף",document.getElementById("impact").value==="yes");
+let t=newTicket("חדשה",description||"ללא תיאור נוסף",document.getElementById("impact").value==="yes");t.trade=document.getElementById("trade").value;save();
 ticketDone(t)
 }
 function ticketDone(t){
@@ -314,29 +334,25 @@ ${btn("🏠 חזרה לבית","home()","gray")}
 </div>`)
 }
 function myTickets(){
-show(`<div class="card"><h2>📋 התקלות שלי</h2>
-${tickets.length?tickets.map((t,i)=>`
-<div class="badge">
-<strong>${t.id}</strong><br>
-${t.generator}<br>
-<span class="safe-desc" data-i="${i}"></span><br>
-סטטוס: ${t.status}<br>השפעה: ${t.impactsReadiness?"🔴 משביתה":"🟢 לא משביתה"}<br>משך טיפול: ${span(t)}<br>
-${t.date}
-${btn("צפייה בפרטי הקריאה",`ticket(${i})`,"gray")}
-</div>`).join(""):"<p>עדיין אין קריאות.</p>"}
-${btn("🏠 חזרה לבית","home()","gray")}
-</div>`);document.querySelectorAll(".safe-desc").forEach(el=>el.textContent=tickets[Number(el.dataset.i)].description)
+let open=tickets.filter(t=>!closed(t)).length,done=tickets.length-open;
+show(`<div class="card"><h2>📋 ניהול קריאות תקלה</h2><div class="ticket-sections"><div class="ticket-section open"><strong>${open}</strong>תקלות פתוחות</div><div class="ticket-section done"><strong>${done}</strong>תקלות שנסגרו</div></div>
+<h3>🟠 תקלות פתוחות — לטיפול / תכנון</h3>${ticketCards("open")}
+<h3>🟢 תקלות שנסגרו — היסטוריה</h3>${ticketCards("done")}
+${btn("🚨 פתיחת תקלה","directReport()","red")}${btn("🏠 חזרה לבית","home()","gray")}</div>`);
+document.querySelectorAll(".safe-desc").forEach(el=>el.textContent=tickets[Number(el.dataset.i)].description)
 }
 function ticket(i){
 let t=tickets[i];if(!t)return myTickets();
 show(`<div class="card">
 <h2>קריאה ${t.id}</h2>
 <p><strong>גנרטור:</strong> ${t.generator}</p>
-<p><strong>סטטוס:</strong> ${t.status}</p>
+<p><strong>סטטוס:</strong> ${esc(t.status)}</p><p><strong>גורם מקצועי:</strong> ${tradeTag(t)}</p>
+${!closed(t)?`<label>עדכון הגורם המקצועי הנדרש</label>${tradeSelect(t.trade||"general")}${btn("שמור גורם מקצועי",`changeTrade(${i})`,"gray")}`:""}
 <p><strong>תיאור:</strong> <span id="ticketDescription"></span></p><p><strong>השפעה על כשירות:</strong> ${t.impactsReadiness?"משביתה":"לא משביתה"}</p><p><strong>משך טיפול:</strong> ${span(t)}</p><p><strong>נפתחה:</strong> ${t.createdAt?new Date(t.createdAt).toLocaleString("he-IL"):t.date||"לא ידוע"}</p><p><strong>נסגרה:</strong> ${t.closedAt?new Date(t.closedAt).toLocaleString("he-IL"):"טרם נסגרה"}</p>
 <h3>היסטוריית אבחון</h3>
 <div id="ticketHistory"></div>
 ${t.status!=="סגורה"&&t.status!=="נסגרה עצמאית"?
+btn("סמן בתכנון",`statusChange(${i},"בתכנון")`,"gold")+
 btn("סמן כבטיפול",`statusChange(${i},"בטיפול")`)+
 btn("סגור קריאה",`statusChange(${i},"סגורה")`,"green"):""}
 ${btn("חזרה לתקלות שלי","myTickets()","gray")}
