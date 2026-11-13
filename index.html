@@ -112,7 +112,7 @@ show(`<div class="card">
 <div class="small">אבחון גנרטור ${generator}</div>
 <div class="progress"><div style="width:${Math.min(100,15+history.length*14)}%"></div></div>
 <h2>🔧 ${node.q}</h2>
-${node.a.map(([label,next])=>btn(label,`answer(${JSON.stringify(label)},${JSON.stringify(next)})`)).join("")}
+${node.a.map(([label,next])=>`<button onclick='answer(${JSON.stringify(label)},${JSON.stringify(next)})'>${label}</button>`).join("")}
 ${btn("⬅ חזרה לשאלה קודמת","back()","gray")}
 ${btn("🏠 ביטול וחזרה לבית","home()","gray")}
 </div>`)
