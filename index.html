@@ -79,6 +79,19 @@ option{background:#102037;color:white}
 .trade-mechanic{background:#432b40;color:#ffc0ed;border:1px solid #895478}
 .trade-general{background:#2a3b46;color:#d5e4f0;border:1px solid #506679}
 .ticket-state{display:inline-block;border-radius:8px;padding:4px 9px;font-size:12px;background:#2a4055;color:#d9edfa;margin:4px}
+
+.plan-filters{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.plan-filters label{font-size:12px}
+.plan-card{border:1px solid #36516a;border-right:4px solid #ffc36d;background:#172b40;border-radius:15px;padding:15px;margin:12px 0}
+.plan-card.critical{border-right-color:#ff657e}
+.plan-card h3{margin:0 0 7px}
+.plan-card .small{margin:5px 0}
+.priority{display:inline-block;border-radius:8px;padding:4px 9px;background:#36455b;color:#e4f2ff;font-size:12px;font-weight:700}
+.priority.high{background:#5d2838;color:#ffc5d0}
+.priority.medium{background:#4b3b24;color:#ffdfac}
+.plan-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.plan-stats div{text-align:center;background:#1b3348;padding:10px 4px;border-radius:12px;font-size:11px}
+.plan-stats strong{display:block;font-size:23px;color:#85e2e7}
 </style>
 </head>
 <body>
@@ -190,6 +203,7 @@ ${gaugeTile("ממוצע 30 ימים",pct(monthStart,now,"all"))}
 ${btn("📈 מעבר לגרפים מפורטים","dashboard()","green")}</section>
 <div class="card"><h2>🗺️ מפת כשירות סכמטית</h2><p class="small">תרשים ציוד להמחשה בלבד — אינו מציג מיקומים גאוגרפיים.</p><div class="fleet-map">${GENERATORS.map(g=>`<button class="fleet-node ${ready(g)?"":"off"}" onclick="generatorCard('${g}')">${g}<small>${ready(g)?"🟢 כשיר":"🔴 לא כשיר"} · בריאות ${health(g)}/100</small></button>`).join("")}</div></div>
 <div class="card"><h2>ניהול מהיר</h2><div class="badge">🛠️ טיפולים חודשיים ממתינים: <strong>${dueMaintenance().length} מתוך ${GENERATORS.length}</strong></div>
+${btn("🗓️ לוח תכנון אחזקה","planningBoard()","gold")}
 ${btn("🛠️ שגרת אחזקה חודשית","maintenanceHome()","gold")}
 ${btn("🔍 התחלת אבחון תקלה","identify()","green")}
 ${btn("🚨 פתיחת תקלה ישירה","directReport()","red")}
@@ -291,6 +305,49 @@ function tradeSelect(value="general"){return `<select id="trade">${Object.entrie
 function changeTrade(i){let el=document.getElementById("trade");if(!el)return;tickets[i].trade=el.value;save();ticket(i)}
 function ticketGroup(t){return closed(t)?"done":"open"}
 function ticketCards(group){let entries=tickets.map((t,i)=>({t,i})).filter(x=>ticketGroup(x.t)===group);return entries.length?entries.map(({t,i})=>`<div class="badge ticket-card ${group==="done"?"done":""}"><strong>${esc(t.id)}</strong><br>${esc(t.generator)}<br>${tradeTag(t)}<br><span class="ticket-state">${esc(t.status)}</span><br><span class="safe-desc" data-i="${i}"></span><br><span class="small">${t.impactsReadiness?"🔴 משביתה":"🟢 לא משביתה"} · משך: ${span(t)}</span><br>${btn("פתיחת פרטי הקריאה",`ticket(${i})`,"gray")}</div>`).join(""):`<p class="small">אין קריאות בקטגוריה זו.</p>`}
+let planTrade="all",planStatus="all";
+const PRIORITIES={critical:"🔴 דחופה",high:"🟠 גבוהה",normal:"🔵 רגילה"};
+const BLOCKERS={none:"אין חסם",electric:"ממתין לחשמלאי",water:"ממתין לאיש מים",mechanic:"ממתין למכונאי",parts:"ממתין לחלפים",approval:"ממתין לאישור",other:"אחר / נדרש בירור"};
+function planningBoard(){
+let open=tickets.map((t,i)=>({t,i})).filter(({t})=>!closed(t));
+let filtered=open.filter(({t})=>(planTrade==="all"||(t.trade||"general")===planTrade)&&(planStatus==="all"||t.status===planStatus));
+filtered.sort((a,b)=>{let rank={critical:0,high:1,normal:2};return (rank[a.t.priority||"normal"]-rank[b.t.priority||"normal"])||(a.t.createdAt||0)-(b.t.createdAt||0)});
+let disabled=GENERATORS.filter(g=>!ready(g));
+show(`<div class="card"><h2>🗓️ לוח תכנון אחזקה</h2><p class="small">ריכוז תקלות פתוחות לפי תחום, דחיפות ושיבוץ. המידע בדפדפן זה בלבד.</p>
+<div class="plan-stats"><div><strong>${open.length}</strong>קריאות פתוחות</div><div><strong>${open.filter(({t})=>t.assignee).length}</strong>משובצות</div><div><strong>${disabled.length}</strong>גנרטורים מושבתים</div></div>
+<div class="plan-filters"><div><label>סינון מקצוע</label><select id="planTrade"><option value="all">כל המקצועות</option>${Object.entries(TRADES).map(([k,x])=>`<option value="${k}">${x[0]}</option>`).join("")}</select></div>
+<div><label>סינון סטטוס</label><select id="planStatus"><option value="all">כל הסטטוסים</option>${["חדשה","בתכנון","בטיפול"].map(x=>`<option value="${x}">${x}</option>`).join("")}</select></div></div>
+${filtered.length?filtered.map(({t,i})=>`<div class="plan-card ${t.priority==="critical"?"critical":""}"><h3>${esc(t.generator)} · ${esc(t.id)}</h3>${tradeTag(t)} <span class="priority ${t.priority==="critical"?"high":t.priority==="high"?"medium":""}">${PRIORITIES[t.priority]||PRIORITIES.normal}</span>
+<p>${esc(t.description||"ללא תיאור")}</p><p class="small">סטטוס: ${esc(t.status)} · ${t.impactsReadiness?"🔴 משביתה":"🟢 לא משביתה"}</p><p class="small">שיבוץ: ${esc(t.assignee||"טרם שובץ")} · חסם: ${esc(BLOCKERS[t.blocker]||BLOCKERS.none)}</p>
+${btn("📝 תכנון ושיבוץ",`planTicket(${i})`,"gold")}${btn("פרטי קריאה",`ticket(${i})`,"gray")}</div>`).join(""):"<p class='note'>אין קריאות פתוחות המתאימות לסינון.</p>"}
+${btn("🏠 חזרה לבית","home()","gray")}</div>
+<div class="card"><h2>🚧 מה מונע חזרה לכשירות?</h2>${disabled.length?disabled.map(g=>`<div class="badge"><strong>${g}</strong>${tickets.filter(t=>t.generator===g&&t.impactsReadiness&&!closed(t)).map(t=>`<p>${tradeTag(t)} · ${esc(BLOCKERS[t.blocker]||"חסם טרם הוגדר")} · ${esc(t.assignee||"טרם שובץ")}</p>`).join("")}</div>`).join(""):"<p>🟢 כל הגנרטורים כשירים כרגע.</p>"}</div>`);
+document.getElementById("planTrade").value=planTrade;document.getElementById("planStatus").value=planStatus;
+document.getElementById("planTrade").onchange=e=>{planTrade=e.target.value;planningBoard()};
+document.getElementById("planStatus").onchange=e=>{planStatus=e.target.value;planningBoard()}
+}
+function planTicket(i){
+let t=tickets[i];if(!t||closed(t))return planningBoard();
+show(`<div class="card"><h2>📝 תכנון קריאה</h2><p>${esc(t.id)} · ${esc(t.generator)}</p>${tradeTag(t)}
+<label>גורם מקצועי</label>${tradeSelect(t.trade||"general")}
+<label>דחיפות</label><select id="planPriority">${Object.entries(PRIORITIES).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
+<label>שיבוץ איש מקצוע (שם דמה בלבד)</label><input id="planAssignee" maxlength="60" placeholder="למשל: חשמלאי א׳" value="${esc(t.assignee||"")}">
+<label>חסם / סיבת המתנה</label><select id="planBlocker">${Object.entries(BLOCKERS).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
+<label>שלב עבודה</label><select id="planStage">${["חדשה","בתכנון","בטיפול"].map(v=>`<option value="${v}">${v}</option>`).join("")}</select>
+${btn("💾 שמור תכנון","savePlan("+i+")","green")}${btn("חזרה ללוח התכנון","planningBoard()","gray")}</div>`);
+document.getElementById("planPriority").value=t.priority||"normal";
+document.getElementById("planBlocker").value=t.blocker||"none";
+document.getElementById("planStage").value=["חדשה","בתכנון","בטיפול"].includes(t.status)?t.status:"בתכנון"
+}
+function savePlan(i){
+let t=tickets[i];if(!t||closed(t))return planningBoard();
+t.trade=document.getElementById("trade").value;
+t.priority=document.getElementById("planPriority").value;
+t.assignee=document.getElementById("planAssignee").value.trim();
+t.blocker=document.getElementById("planBlocker").value;
+t.status=document.getElementById("planStage").value;
+save();planningBoard()
+}
 function report(){
 show(`<div class="card">
 <h2>🚨 פתיחת קריאת תקלה</h2>
@@ -338,7 +395,7 @@ let open=tickets.filter(t=>!closed(t)).length,done=tickets.length-open;
 show(`<div class="card"><h2>📋 ניהול קריאות תקלה</h2><div class="ticket-sections"><div class="ticket-section open"><strong>${open}</strong>תקלות פתוחות</div><div class="ticket-section done"><strong>${done}</strong>תקלות שנסגרו</div></div>
 <h3>🟠 תקלות פתוחות — לטיפול / תכנון</h3>${ticketCards("open")}
 <h3>🟢 תקלות שנסגרו — היסטוריה</h3>${ticketCards("done")}
-${btn("🚨 פתיחת תקלה","directReport()","red")}${btn("🏠 חזרה לבית","home()","gray")}</div>`);
+${btn("🚨 פתיחת תקלה","directReport()","red")}${btn("🗓️ לוח תכנון","planningBoard()","gold")}${btn("🏠 חזרה לבית","home()","gray")}</div>`);
 document.querySelectorAll(".safe-desc").forEach(el=>el.textContent=tickets[Number(el.dataset.i)].description)
 }
 function ticket(i){
@@ -352,6 +409,7 @@ ${!closed(t)?`<label>עדכון הגורם המקצועי הנדרש</label>${tr
 <h3>היסטוריית אבחון</h3>
 <div id="ticketHistory"></div>
 ${t.status!=="סגורה"&&t.status!=="נסגרה עצמאית"?
+btn("🗓️ תכנון ושיבוץ",`planTicket(${i})`,"gold")+
 btn("סמן בתכנון",`statusChange(${i},"בתכנון")`,"gold")+
 btn("סמן כבטיפול",`statusChange(${i},"בטיפול")`)+
 btn("סגור קריאה",`statusChange(${i},"סגורה")`,"green"):""}
