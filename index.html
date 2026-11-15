@@ -97,6 +97,11 @@ option{background:#102037;color:white}
 .timeline-entry time{display:block;font-size:12px;color:#9cc8d6;margin-bottom:5px}
 .timeline-entry strong{color:#7ce3e6}
 .duplicate-warning{background:#42301f;border:1px solid #a77938;border-radius:13px;padding:13px;color:#ffe0a9;margin:12px 0}
+
+.role-select{background:#1b3448;border:1px solid #4c6a7c;border-radius:13px;padding:11px;width:100%;color:#f3fcff}
+.notice-item{background:#1a3045;border-right:4px solid #4bd4e0;border-radius:13px;padding:14px;margin:11px 0}
+.notice-item.pending{border-right-color:#ffc36d}
+.notice-count{background:#e65d78;color:white;border-radius:99px;padding:2px 8px;font-weight:800}
 </style>
 </head>
 <body>
@@ -208,6 +213,7 @@ ${gaugeTile("ממוצע 30 ימים",pct(monthStart,now,"all"))}
 </div><div class="home-strip"><div><strong>${readyCount}/${GENERATORS.length}</strong>כשירים</div><div><strong style="color:${off?"#ff8298":"#5be1bd"}">${off}</strong>מושבתים</div><div><strong>${open}</strong>קריאות פתוחות</div></div>
 ${btn("📈 מעבר לגרפים מפורטים","dashboard()","green")}</section>
 <div class="card"><h2>🗺️ מפת כשירות סכמטית</h2><p class="small">תרשים ציוד להמחשה בלבד — אינו מציג מיקומים גאוגרפיים.</p><div class="fleet-map">${GENERATORS.map(g=>`<button class="fleet-node ${ready(g)?"":"off"}" onclick="generatorCard('${g}')">${g}<small>${ready(g)?"🟢 כשיר":"🔴 לא כשיר"} · בריאות ${health(g)}/100</small></button>`).join("")}</div></div>
+<div class="card"><h2>👥 התנסות בניתוב והתראות</h2><p class="small">בחר תפקיד דמה כדי לראות את התור של מנהל המקצוע או את המשימות של הטכנאי ששובץ.</p><select id="demoRole" class="role-select" onchange="setDemoUser()">${DEMO_PEOPLE.map(x=>`<option value="${x.id}" ${demoUser===x.id?"selected":""}>${esc(x.label)}</option>`).join("")}</select><p>🔔 משימות הממתינות לתפקיד זה: <strong class="notice-count">${inboxEntries().length}</strong></p>${btn("🔔 פתיחת תיבת המשימות","inbox()","green")}</div>
 <div class="card"><h2>ניהול מהיר</h2><div class="badge">🛠️ טיפולים חודשיים ממתינים: <strong>${dueMaintenance().length} מתוך ${GENERATORS.length}</strong></div>
 ${btn("🗓️ לוח תכנון אחזקה","planningBoard()","gold")}
 ${btn("🛠️ שגרת אחזקה חודשית","maintenanceHome()","gold")}
@@ -308,7 +314,7 @@ function directReport(){history=[];result="unresolved";report()}
 const TRADES={electric:["⚡ נדרש טיפול חשמלאי","trade-electric"],water:["💧 נדרש טיפול מים","trade-water"],mechanic:["🔧 נדרש טיפול מכונאי","trade-mechanic"],general:["🧰 נדרש אבחון / שיבוץ","trade-general"]};
 function tradeTag(t){let x=TRADES[t.trade]||TRADES.general;return `<span class="trade-tag ${x[1]}">${x[0]}</span>`}
 function tradeSelect(value="general"){return `<select id="trade">${Object.entries(TRADES).map(([key,x])=>`<option value="${key}" ${value===key?"selected":""}>${x[0]}</option>`).join("")}</select>`}
-function changeTrade(i){let el=document.getElementById("trade");if(!el)return;let t=tickets[i],old=t.trade||"general";if(old!==el.value){logEvent(t,"משתמש דמה","שינוי תחום טיפול: "+TRADES[old][0]+" ← "+TRADES[el.value][0],"handoff");t.trade=el.value}save();ticket(i)}
+function changeTrade(i){let el=document.getElementById("trade");if(!el)return;let t=tickets[i],old=t.trade||"general";if(old!==el.value){logEvent(t,"משתמש דמה","שינוי תחום טיפול: "+TRADES[old][0]+" ← "+TRADES[el.value][0],"handoff");t.trade=el.value;routeFault(t)}save();ticket(i)}
 function ticketGroup(t){return closed(t)?"done":"open"}
 function ticketCards(group){let entries=tickets.map((t,i)=>({t,i})).filter(x=>ticketGroup(x.t)===group);return entries.length?entries.map(({t,i})=>`<div class="badge ticket-card ${group==="done"?"done":""}"><strong>${esc(t.id)}</strong><br>${esc(t.generator)}<br>${tradeTag(t)}<br><span class="ticket-state">${esc(t.status)}</span><br><span class="safe-desc" data-i="${i}"></span><br><span class="small">${t.impactsReadiness?"🔴 משביתה":"🟢 לא משביתה"} · משך מתחילת הקריאה: ${span(t)}</span><br>${btn("פתיחת פרטי הקריאה",`ticket(${i})`,"gray")}</div>`).join(""):`<p class="small">אין קריאות בקטגוריה זו.</p>`}
 let planTrade="all",planStatus="all";
@@ -347,7 +353,7 @@ document.getElementById("planStage").value=["חדשה","בתכנון","בטיפ�
 }
 function savePlan(i){
 let t=tickets[i];if(!t||closed(t))return planningBoard();
-t.trade=document.getElementById("trade").value;
+let previousTrade=t.trade||"general";t.trade=document.getElementById("trade").value;if(previousTrade!==t.trade)routeFault(t,currentPerson().label);
 t.priority=document.getElementById("planPriority").value;
 t.assignee=document.getElementById("planAssignee").value.trim();
 t.blocker=document.getElementById("planBlocker").value;
@@ -358,8 +364,39 @@ function activeTicket(g){return tickets.findIndex(t=>t.generator===g&&!closed(t)
 function logEvent(t,actor,text,kind="update"){if(!Array.isArray(t.timeline))t.timeline=[];t.timeline.push({at:Date.now(),actor:actor||"משתמש דמה",text,kind})}
 function eventHtml(t){let events=Array.isArray(t.timeline)?t.timeline:[];return events.length?events.map(e=>`<div class="timeline-entry"><time>${new Date(e.at).toLocaleString("he-IL")}</time><strong>${esc(e.actor)}</strong><p>${esc(e.text)}</p></div>`).join(""):"<p class='small'>אין עדכוני המשך עדיין. התיאור המקורי והיסטוריית האבחון נשמרים בנפרד.</p>"}
 function checkDuplicate(){let g=document.getElementById("reportGen").value,i=activeTicket(g),el=document.getElementById("duplicateNotice"),send=document.getElementById("createNewBtn");if(!el)return;if(i>=0){el.innerHTML=`<div class="duplicate-warning">⚠️ לגנרטור ${esc(g)} כבר קיימת קריאה פתוחה (${esc(tickets[i].id)}). לא תיפתח קריאה נוספת.<br>${btn("המשך טיפול בקריאה הקיימת",`ticket(${i})`,"gold")}</div>`;if(send)send.style.display="none"}else{el.innerHTML="";if(send)send.style.display="block"}}
-function appendUpdate(i){let t=tickets[i];if(!t||closed(t))return;let actor=document.getElementById("updateActor").value.trim()||"איש מקצוע דמה",note=document.getElementById("updateNote").value.trim(),trade=document.getElementById("updateTrade").value;if(!note){alert("יש לכתוב מה נבדק או בוצע");return}let old=t.trade||"general";logEvent(t,actor,note,"diagnosis");if(trade!==old){logEvent(t,actor,"העברת טיפול: "+TRADES[old][0]+" ← "+TRADES[trade][0],"handoff");t.trade=trade;t.status="בתכנון"}else if(t.status==="חדשה")t.status="בטיפול";t.lastActor=actor;save();ticket(i)}
+function appendUpdate(i){let t=tickets[i];if(!t||closed(t))return;let actor=document.getElementById("updateActor").value.trim()||"איש מקצוע דמה",note=document.getElementById("updateNote").value.trim(),trade=document.getElementById("updateTrade").value;if(!note){alert("יש לכתוב מה נבדק או בוצע");return}let old=t.trade||"general";logEvent(t,actor,note,"diagnosis");if(trade!==old){logEvent(t,actor,"העברת טיפול: "+TRADES[old][0]+" ← "+TRADES[trade][0],"handoff");t.trade=trade;routeFault(t,actor)}else if(t.status==="חדשה")t.status="בטיפול";t.lastActor=actor;save();ticket(i)}
 function updateForm(i){let t=tickets[i];if(!t||closed(t))return ticket(i);show(`<div class="card"><h2>📝 המשך סיפור תקלה</h2><p>${esc(t.generator)} · ${esc(t.id)}</p><p class="note">כל עדכון יתווסף לסיפור הדרך עם תאריך ושעה. מידע קודם לא יימחק, ומדידת משך התקלה תמשיך מתאריך הפתיחה המקורי.</p><label>מי ביצע את האבחון / העדכון?</label><input id="updateActor" maxlength="70" placeholder="לדוגמה: מכונאי א׳ (דמה בלבד)"><label>מה נבדק, מה נמצא ומה בוצע?</label><textarea id="updateNote" rows="5" maxlength="1200" placeholder="תיאור המשך הטיפול"></textarea><label>העברה לגורם מקצועי אחר (אם נדרש)</label><select id="updateTrade">${Object.entries(TRADES).map(([k,v])=>`<option value="${k}">${v[0]}</option>`).join("")}</select>${btn("💾 הוסף עדכון לסיפור הדרך",`appendUpdate(${i})`,"green")}${btn("חזרה לקריאה",`ticket(${i})`,"gray")}</div>`);document.getElementById("updateTrade").value=t.trade||"general"}
+const DEMO_PEOPLE=[
+{id:"reporter",label:"👤 מדווח שטח",role:"reporter"},
+{id:"manager-electric",label:"👨‍💼 מנהל חשמלאים",role:"manager",trade:"electric"},
+{id:"manager-mechanic",label:"👨‍💼 מנהל מכונאים",role:"manager",trade:"mechanic"},
+{id:"manager-water",label:"👨‍💼 מנהל מים",role:"manager",trade:"water"},
+{id:"manager-general",label:"👨‍💼 מנהל אבחון",role:"manager",trade:"general"},
+{id:"tech-electric-1",label:"⚡ חשמלאי א׳",role:"tech",trade:"electric"},
+{id:"tech-electric-2",label:"⚡ חשמלאי ב׳",role:"tech",trade:"electric"},
+{id:"tech-mechanic-1",label:"🔧 מכונאי א׳",role:"tech",trade:"mechanic"},
+{id:"tech-mechanic-2",label:"🔧 מכונאי ב׳",role:"tech",trade:"mechanic"},
+{id:"tech-water-1",label:"💧 איש מים א׳",role:"tech",trade:"water"},
+{id:"tech-general-1",label:"🧰 מאבחן א׳",role:"tech",trade:"general"},
+{id:"maintenance-chief",label:"🛠️ מנהל אחזקה",role:"chief"}
+];
+let demoUser=localStorage.getItem("generator_demo_role")||"reporter";
+function currentPerson(){return DEMO_PEOPLE.find(x=>x.id===demoUser)||DEMO_PEOPLE[0]}
+function personName(id){return (DEMO_PEOPLE.find(x=>x.id===id)||{}).label||"טרם שובץ"}
+function routeManager(t){return DEMO_PEOPLE.find(x=>x.role==="manager"&&x.trade===(t.trade||"general"))}
+function setDemoUser(){demoUser=document.getElementById("demoRole").value;localStorage.setItem("generator_demo_role",demoUser);home()}
+function routeFault(t,actor="מערכת"){t.assignedId=null;t.acceptedAt=null;t.managerId=routeManager(t)?.id||"manager-general";t.status="בתכנון";logEvent(t,actor,"הקריאה הועברה לתור "+personName(t.managerId),"route")}
+function inboxEntries(){let p=currentPerson();return tickets.map((t,i)=>({t,i})).filter(({t})=>!closed(t)&&(p.role==="chief"||(p.role==="manager"&&t.managerId===p.id)||(p.role==="tech"&&t.assignedId===p.id)))}
+function inbox(){
+let p=currentPerson(),entries=inboxEntries();show(`<div class="card"><h2>🔔 תיבת משימות — ${esc(p.label)}</h2><p class="small">התראות פנימיות לדוגמה; מעבר בין משתמשי הדמה מדמה מכשירים שונים, אך אינו שולח התראות אמיתיות.</p>
+${entries.length?entries.map(({t,i})=>`<div class="notice-item ${!t.assignedId?"pending":""}"><strong>${esc(t.generator)}</strong> · ${esc(t.id)}<br>${tradeTag(t)}<p>${esc(t.description)}</p><p class="small">${!t.assignedId?"🟠 ממתין לשיבוץ":t.acceptedAt?"🟢 התקבלה המשימה":"🟡 ממתין לאישור קבלה"} · ${esc(t.status)}</p>
+${p.role==="manager"&&!t.assignedId?btn("👨‍🔧 שיבוץ איש מקצוע",`assignScreen(${i})`,"gold"):""}
+${p.role==="tech"&&!t.acceptedAt?btn("✅ קיבלתי את המשימה",`acceptTask(${i})`,"green"):""}
+${btn("📖 סיפור דרך",`ticket(${i})`,"gray")}</div>`).join(""):"<p>אין משימות פתוחות עבור המשתמש הנבחר.</p>"}
+${btn("🏠 חזרה לבית","home()","gray")}</div>`)}
+function assignScreen(i){let t=tickets[i],p=currentPerson();if(!t||closed(t)||p.role!=="manager"||t.managerId!==p.id)return inbox();let eligible=DEMO_PEOPLE.filter(x=>x.role==="tech"&&x.trade===t.trade);show(`<div class="card"><h2>👨‍🔧 שיבוץ משימה</h2><p>${esc(t.generator)} · ${tradeTag(t)}</p><label>בחירת איש מקצוע</label><select id="assignPerson">${eligible.map(x=>`<option value="${x.id}">${esc(x.label)}</option>`).join("")}</select>${btn("שבץ ושלח התראה",`assignTask(${i})`,"green")}${btn("חזרה","inbox()","gray")}</div>`)}
+function assignTask(i){let t=tickets[i],p=currentPerson(),selected=document.getElementById("assignPerson")?.value;if(!t||closed(t)||p.role!=="manager"||t.managerId!==p.id||!DEMO_PEOPLE.some(x=>x.id===selected&&x.role==="tech"&&x.trade===t.trade))return inbox();t.assignedId=selected;t.acceptedAt=null;t.assignee=personName(selected);t.status="בתכנון";logEvent(t,p.label,"שובץ "+personName(selected)+" ונשלחה התראה פנימית","assign");save();inbox()}
+function acceptTask(i){let t=tickets[i],p=currentPerson();if(!t||closed(t)||p.role!=="tech"||t.assignedId!==p.id)return inbox();t.acceptedAt=Date.now();t.status="בטיפול";logEvent(t,p.label,"אישר קבלת המשימה","accept");save();inbox()}
 function report(){
 show(`<div class="card">
 <h2>🚨 פתיחת קריאת תקלה</h2>
@@ -379,7 +416,7 @@ generator,status,description,result,
 history:[...history],
 trade:"general",date:new Date().toLocaleString("he-IL"),createdAt:Date.now(),closedAt:["סגורה","נסגרה עצמאית"].includes(status)?Date.now():null,impactsReadiness
 };
-logEvent(t,"משתמש דמה","נפתחה קריאה: "+description,"open");tickets.unshift(t);save();return t
+logEvent(t,"משתמש דמה","נפתחה קריאה: "+description,"open");if(!closed(t))routeFault(t);tickets.unshift(t);save();return t
 }
 function closeSelf(){
 let t=newTicket("נסגרה עצמאית","המשתמש דיווח שהתקלה נפתרה");
@@ -389,7 +426,7 @@ function createTicket(){
 let description=document.getElementById("description").value.trim();
 generator=document.getElementById("reportGen").value;
 if(activeTicket(generator)>=0){ticket(activeTicket(generator));return}
-let t=newTicket("חדשה",description||"ללא תיאור נוסף",document.getElementById("impact").value==="yes");if(!t)return;t.trade=document.getElementById("trade").value;save();
+let t=newTicket("חדשה",description||"ללא תיאור נוסף",document.getElementById("impact").value==="yes");if(!t)return;t.trade=document.getElementById("trade").value;routeFault(t);save();
 ticketDone(t)
 }
 function ticketDone(t){
