@@ -109,6 +109,7 @@ option{background:#102037;color:white}
 <h1>⚡ מרכז ניהול גנרטורים</h1>
 <p>אבחון תקלות • כשירות • אחזקה חודשית</p>
 </header>
+<div id="quickRoleBar" style="max-width:740px;margin:12px auto 0;padding:12px 16px;background:#173349;border:2px solid #53d9e7;border-radius:16px"><strong>👤 מעבר בין משתמשי הדגמה</strong><select id="quickRole" aria-label="בחירת משתמש הדגמה" onchange="switchQuickRole(this.value)" style="margin:7px 0 0"></select></div>
 <main id="app"></main>
 <script>
 const $=document.getElementById("app");
@@ -211,7 +212,7 @@ show(`<section class="home-hero"><h2>👋 שלום, ${esc(currentPerson().label)
 <div class="card"><p class="small">סביבת הדגמה מקומית בלבד. אין להזין פרטי ציוד, אנשים או מיקומים אמיתיים.</p></div>`);
 }
 function canViewTicket(t){return currentPerson().role!=="reporter"||t.reporterId===demoUser}
-function home(){if(currentPerson().role==="reporter")return reporterHome();
+function home(){let q=document.getElementById("quickRole");if(q){q.innerHTML=DEMO_PEOPLE.map(p=>`<option value="${p.id}" ${p.id===demoUser?"selected":""}>${esc(p.label)}</option>`).join("")}if(currentPerson().role==="reporter")return reporterHome();
 let now=Date.now(),weekStart=now-7*86400000,monthStart=now-30*86400000;
 let readyCount=GENERATORS.filter(ready).length,off=GENERATORS.length-readyCount,open=tickets.filter(t=>!closed(t)).length;
 show(`<section class="home-hero"><h2>⚡ תמונת מצב בזמן אמת</h2><p class="small">מערך גנרטורים לדוגמה · הנתונים מעודכנים לפי הקריאות בדפדפן זה</p><div class="gauge-grid">
@@ -393,7 +394,8 @@ let demoUser=localStorage.getItem("generator_demo_role")||"reporter";
 function currentPerson(){return DEMO_PEOPLE.find(x=>x.id===demoUser)||DEMO_PEOPLE[0]}
 function personName(id){return (DEMO_PEOPLE.find(x=>x.id===id)||{}).label||"טרם שובץ"}
 function routeManager(t){return DEMO_PEOPLE.find(x=>x.role==="manager"&&x.trade===(t.trade||"general"))}
-function setDemoUser(){demoUser=document.getElementById("demoRole").value;localStorage.setItem("generator_demo_role",demoUser);home()}
+function switchQuickRole(id){if(!DEMO_PEOPLE.some(p=>p.id===id))return;demoUser=id;localStorage.setItem("generator_demo_role",demoUser);home()}
+function setDemoUser(){switchQuickRole(document.getElementById("demoRole").value)}
 function routeFault(t,actor="מערכת"){t.assignedId=null;t.acceptedAt=null;t.managerId=routeManager(t)?.id||"manager-general";t.status="בתכנון";logEvent(t,actor,"הקריאה הועברה לתור "+personName(t.managerId),"route")}
 function inboxEntries(){let p=currentPerson();return tickets.map((t,i)=>({t,i})).filter(({t})=>!closed(t)&&(p.role==="chief"||(p.role==="manager"&&t.managerId===p.id)||(p.role==="tech"&&t.assignedId===p.id)))}
 function inbox(){
