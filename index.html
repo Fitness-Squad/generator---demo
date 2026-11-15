@@ -212,7 +212,13 @@ show(`<section class="home-hero"><h2>👋 שלום, ${esc(currentPerson().label)
 <div class="card"><p class="small">סביבת הדגמה מקומית בלבד. אין להזין פרטי ציוד, אנשים או מיקומים אמיתיים.</p></div>`);
 }
 function canViewTicket(t){return currentPerson().role!=="reporter"||t.reporterId===demoUser}
-function home(){let q=document.getElementById("quickRole");if(q){q.innerHTML=DEMO_PEOPLE.map(p=>`<option value="${p.id}" ${p.id===demoUser?"selected":""}>${esc(p.label)}</option>`).join("")}if(currentPerson().role==="reporter")return reporterHome();
+function managerHome(){
+let p=currentPerson(),own=tickets.map((t,i)=>({t,i})).filter(({t})=>!closed(t)&&(t.trade||"general")===p.trade);
+show(`<section class="home-hero"><h2>${esc(p.label)} — ניהול שיבוצים</h2><p>כאן משבצים אנשי מקצוע מתוך רשימת העובדים בתחום שלך.</p><div class="home-strip"><div><strong>${own.length}</strong>קריאות פתוחות</div><div><strong>${own.filter(({t})=>!t.assignedId).length}</strong>ממתינות לשיבוץ</div><div><strong>${own.filter(({t})=>t.assignedId&&!t.acceptedAt).length}</strong>ממתינות לאישור</div></div></section>
+<div class="card"><h2>👨‍🔧 הקריאות בתחום שלי</h2>${own.length?own.map(({t,i})=>`<div class="notice-item"><strong>${esc(t.generator)}</strong> · ${esc(t.id)}<p>${esc(t.description)}</p><p>שובץ: <strong>${esc(t.assignedId?personName(t.assignedId):"טרם שובץ")}</strong> · ${t.acceptedAt?"🟢 אישר קבלה":t.assignedId?"🟡 ממתין לאישור":"🟠 ממתין לשיבוץ"}</p>${btn(t.assignedId?"🔄 שינוי שיבוץ":"👨‍🔧 שיבוץ איש מקצוע",`assignScreen(${i})`,"gold")}${btn("📖 פרטי תקלה",`ticket(${i})`,"gray")}</div>`).join(""):"<p>אין קריאות פתוחות בתחום זה.</p>"}${btn("🔔 תיבת המשימות","inbox()","green")}</div>
+<div class="card"><h3>🧪 מעבר בין משתמשי הדגמה</h3><select id="demoRole" onchange="setDemoUser()">${DEMO_PEOPLE.map(x=>`<option value="${x.id}" ${demoUser===x.id?"selected":""}>${esc(x.label)}</option>`).join("")}</select></div>`);
+}
+function home(){let q=document.getElementById("quickRole");if(q){q.innerHTML=DEMO_PEOPLE.map(p=>`<option value="${p.id}" ${p.id===demoUser?"selected":""}>${esc(p.label)}</option>`).join("")}if(currentPerson().role==="reporter")return reporterHome();if(currentPerson().role==="manager")return managerHome();
 let now=Date.now(),weekStart=now-7*86400000,monthStart=now-30*86400000;
 let readyCount=GENERATORS.filter(ready).length,off=GENERATORS.length-readyCount,open=tickets.filter(t=>!closed(t)).length;
 show(`<section class="home-hero"><h2>⚡ תמונת מצב בזמן אמת</h2><p class="small">מערך גנרטורים לדוגמה · הנתונים מעודכנים לפי הקריאות בדפדפן זה</p><div class="gauge-grid">
@@ -330,7 +336,7 @@ let planTrade="all",planStatus="all";
 const PRIORITIES={critical:"🔴 דחופה",high:"🟠 גבוהה",normal:"🔵 רגילה"};
 const BLOCKERS={none:"אין חסם",electric:"ממתין לחשמלאי",water:"ממתין לאיש מים",mechanic:"ממתין למכונאי",parts:"ממתין לחלפים",approval:"ממתין לאישור",other:"אחר / נדרש בירור"};
 function planningBoard(){if(currentPerson().role==="reporter")return reporterHome();
-let open=tickets.map((t,i)=>({t,i})).filter(({t})=>!closed(t));
+let open=tickets.map((t,i)=>({t,i})).filter(({t})=>!closed(t)&&(currentPerson().role!=="manager"||t.trade===currentPerson().trade));
 let filtered=open.filter(({t})=>(planTrade==="all"||(t.trade||"general")===planTrade)&&(planStatus==="all"||t.status===planStatus));
 filtered.sort((a,b)=>{let rank={critical:0,high:1,normal:2};return (rank[a.t.priority||"normal"]-rank[b.t.priority||"normal"])||(a.t.createdAt||0)-(b.t.createdAt||0)});
 let disabled=GENERATORS.filter(g=>!ready(g));
@@ -348,7 +354,7 @@ document.getElementById("planTrade").onchange=e=>{planTrade=e.target.value;plann
 document.getElementById("planStatus").onchange=e=>{planStatus=e.target.value;planningBoard()}
 }
 function planTicket(i){
-let t=tickets[i];if(!t||closed(t))return planningBoard();
+let t=tickets[i];if(!t||closed(t))return planningBoard();if(currentPerson().role==="manager")return assignScreen(i);
 show(`<div class="card"><h2>📝 תכנון קריאה</h2><p>${esc(t.id)} · ${esc(t.generator)}</p>${tradeTag(t)}
 <label>גורם מקצועי</label>${tradeSelect(t.trade||"general")}
 <label>דחיפות</label><select id="planPriority">${Object.entries(PRIORITIES).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
@@ -360,7 +366,7 @@ document.getElementById("planPriority").value=t.priority||"normal";
 document.getElementById("planBlocker").value=t.blocker||"none";
 document.getElementById("planStage").value=["חדשה","בתכנון","בטיפול"].includes(t.status)?t.status:"בתכנון"
 }
-function savePlan(i){if(currentPerson().role==="reporter")return reporterHome();
+function savePlan(i){if(currentPerson().role==="reporter"||currentPerson().role==="manager")return home();
 let t=tickets[i];if(!t||closed(t))return planningBoard();
 let previousTrade=t.trade||"general";t.trade=document.getElementById("trade").value;if(previousTrade!==t.trade)routeFault(t,currentPerson().label);
 t.priority=document.getElementById("planPriority").value;
@@ -401,12 +407,12 @@ function inboxEntries(){let p=currentPerson();return tickets.map((t,i)=>({t,i}))
 function inbox(){
 if(currentPerson().role==="reporter")return reporterHome();let p=currentPerson(),entries=inboxEntries();show(`<div class="card"><h2>🔔 תיבת משימות — ${esc(p.label)}</h2><p class="small">התראות פנימיות לדוגמה; מעבר בין משתמשי הדמה מדמה מכשירים שונים, אך אינו שולח התראות אמיתיות.</p>
 ${entries.length?entries.map(({t,i})=>`<div class="notice-item ${!t.assignedId?"pending":""}"><strong>${esc(t.generator)}</strong> · ${esc(t.id)}<br>${tradeTag(t)}<p>${esc(t.description)}</p><p class="small">${!t.assignedId?"🟠 ממתין לשיבוץ":t.acceptedAt?"🟢 התקבלה המשימה":"🟡 ממתין לאישור קבלה"} · ${esc(t.status)}</p>
-${p.role==="manager"&&!t.assignedId?btn("👨‍🔧 שיבוץ איש מקצוע",`assignScreen(${i})`,"gold"):""}
+${p.role==="manager"?btn(t.assignedId?"🔄 שינוי שיבוץ":"👨‍🔧 שיבוץ איש מקצוע",`assignScreen(${i})`,"gold"):""}
 ${p.role==="tech"&&!t.acceptedAt?btn("✅ קיבלתי את המשימה",`acceptTask(${i})`,"green"):""}
 ${btn("📖 סיפור דרך",`ticket(${i})`,"gray")}</div>`).join(""):"<p>אין משימות פתוחות עבור המשתמש הנבחר.</p>"}
 ${btn("🏠 חזרה לבית","home()","gray")}</div>`)}
-function assignScreen(i){let t=tickets[i],p=currentPerson();if(!t||closed(t)||p.role!=="manager"||t.managerId!==p.id)return inbox();let eligible=DEMO_PEOPLE.filter(x=>x.role==="tech"&&x.trade===t.trade);show(`<div class="card"><h2>👨‍🔧 שיבוץ משימה</h2><p>${esc(t.generator)} · ${tradeTag(t)}</p><label>בחירת איש מקצוע</label><select id="assignPerson">${eligible.map(x=>`<option value="${x.id}">${esc(x.label)}</option>`).join("")}</select>${btn("שבץ ושלח התראה",`assignTask(${i})`,"green")}${btn("חזרה","inbox()","gray")}</div>`)}
-function assignTask(i){let t=tickets[i],p=currentPerson(),selected=document.getElementById("assignPerson")?.value;if(!t||closed(t)||p.role!=="manager"||t.managerId!==p.id||!DEMO_PEOPLE.some(x=>x.id===selected&&x.role==="tech"&&x.trade===t.trade))return inbox();t.assignedId=selected;t.acceptedAt=null;t.assignee=personName(selected);t.status="בתכנון";logEvent(t,p.label,"שובץ "+personName(selected)+" ונשלחה התראה פנימית","assign");save();inbox()}
+function assignScreen(i){let t=tickets[i],p=currentPerson();if(!t||closed(t)||p.role!=="manager"||t.trade!==p.trade)return managerHome();let eligible=DEMO_PEOPLE.filter(x=>x.role==="tech"&&x.trade===t.trade);show(`<div class="card"><h2>👨‍🔧 שיבוץ משימה</h2><p>${esc(t.generator)} · ${tradeTag(t)}</p><label>בחירת איש מקצוע</label><select id="assignPerson">${eligible.map(x=>`<option value="${x.id}">${esc(x.label)}</option>`).join("")}</select>${btn("שבץ ושלח התראה",`assignTask(${i})`,"green")}${btn("חזרה","managerHome()","gray")}</div>`)}
+function assignTask(i){let t=tickets[i],p=currentPerson(),selected=document.getElementById("assignPerson")?.value;if(!t||closed(t)||p.role!=="manager"||t.trade!==p.trade||!DEMO_PEOPLE.some(x=>x.id===selected&&x.role==="tech"&&x.trade===t.trade))return inbox();t.assignedId=selected;t.acceptedAt=null;t.assignee=personName(selected);t.status="בתכנון";logEvent(t,p.label,"שובץ "+personName(selected)+" ונשלחה התראה פנימית","assign");save();managerHome()}
 function acceptTask(i){let t=tickets[i],p=currentPerson();if(!t||closed(t)||p.role!=="tech"||t.assignedId!==p.id)return inbox();t.acceptedAt=Date.now();t.status="בטיפול";logEvent(t,p.label,"אישר קבלת המשימה","accept");save();inbox()}
 function report(){
 show(`<div class="card">
